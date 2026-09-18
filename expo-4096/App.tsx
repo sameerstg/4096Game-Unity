@@ -55,6 +55,9 @@ function Game() {
   const modeIndexRef = useRef<number | null>(null);
   modeIndexRef.current = modeIndex;
   const busy = useRef(false);
+  /** one swipe made mid-animation, replayed when the turn finishes */
+  const pending = useRef<Direction | null>(null);
+  const moveRef = useRef<((direction: Direction) => void) | null>(null);
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   const sounds = useSounds(musicOn);
@@ -65,7 +68,20 @@ function Game() {
   }, []);
 
   const schedule = useCallback((task: () => void, delay: number) => {
-    timers.current.push(setTimeout(task, delay));
+    const id = setTimeout(() => {
+      timers.current = timers.current.filter((timer) => timer !== id);
+      task();
+    }, delay);
+    timers.current.push(id);
+  }, []);
+
+  /**
+   * Keeps gameRef in step with state synchronously: a buffered swipe runs
+   * before React re-renders, so it must not read a stale board.
+   */
+  const commitState = useCallback((next: GameState | null) => {
+    gameRef.current = next;
+    setGame(next);
   }, []);
 
   useEffect(() => clearTimers, [clearTimers]);
@@ -102,13 +118,13 @@ function Game() {
         return;
       }
       setBest(savedBest);
-      setGame(deserialize(savedBoard, mode) ?? createGame(mode));
+      commitState(deserialize(savedBoard, mode) ?? createGame(mode));
       busy.current = false;
     })();
     return () => {
       cancelled = true;
     };
-  }, [modeIndex]);
+  }, [commitState, modeIndex]);
 
   useEffect(() => {
     if (!game || game.score <= best) {
@@ -125,24 +141,31 @@ function Game() {
     }
     const mode = MODES[index];
     const fresh = createGame(mode);
-    setGame(fresh);
+    pending.current = null;
+    commitState(fresh);
     busy.current = false;
     void saveBoard(mode.target, serialize(fresh));
-  }, []);
+  }, [commitState]);
 
   const finish = useCallback(
     (state: GameState, status: 'won' | 'lost') => {
-      setGame({ ...state, status });
+      pending.current = null;
+      commitState({ ...state, status });
       void clearBoard(state.target);
       schedule(startFresh, RESULT_PAUSE);
     },
-    [schedule, startFresh]
+    [commitState, schedule, startFresh]
   );
 
   const handleMove = useCallback(
     (direction: Direction) => {
       const current = gameRef.current;
-      if (!current || busy.current || current.status !== 'playing') {
+      if (!current || current.status !== 'playing') {
+        return;
+      }
+      // mid-animation: remember the swipe instead of dropping it
+      if (busy.current) {
+        pending.current = direction;
         return;
       }
 
@@ -152,7 +175,7 @@ function Game() {
       }
 
       busy.current = true;
-      setGame(result.state);
+      commitState(result.state);
       if (result.merges > 0) {
         sounds.playMatch();
       } else {
@@ -169,7 +192,7 @@ function Game() {
         }
 
         const next = spawnTile(settled);
-        setGame(next);
+        commitState(next);
 
         if (!hasMoves(next)) {
           sounds.playLose();
@@ -179,10 +202,18 @@ function Game() {
 
         busy.current = false;
         void saveBoard(next.target, serialize(next));
+
+        const queued = pending.current;
+        pending.current = null;
+        if (queued) {
+          moveRef.current?.(queued);
+        }
       }, MOVE_DURATION + 40);
     },
-    [finish, schedule, sounds]
+    [commitState, finish, schedule, sounds]
   );
+
+  moveRef.current = handleMove;
 
   const panHandlers = useControls(handleMove);
 
@@ -197,15 +228,17 @@ function Game() {
       }
       clearTimers();
       busy.current = true;
-      setGame(null);
+      pending.current = null;
+      commitState(null);
       setModeIndex(index);
       void saveModeIndex(index);
     },
-    [clearTimers]
+    [clearTimers, commitState]
   );
 
   const restart = useCallback(() => {
     clearTimers();
+    pending.current = null;
     startFresh();
   }, [clearTimers, startFresh]);
 
@@ -245,7 +278,7 @@ function Game() {
   );
 
   const boardPane = (
-    <View style={styles.boardArea} onLayout={onAreaLayout} {...panHandlers}>
+    <View style={styles.boardArea} onLayout={onAreaLayout}>
       {/* absolute so the board's size can never feed back into the measured area */}
       <View style={styles.boardCenter}>
         {game && boardSize > 0 ? <Board state={game} boardSize={boardSize} /> : null}
@@ -254,7 +287,10 @@ function Game() {
   );
 
   return (
+    // swipes are handled on the root so the HUD area is not a dead zone;
+    // buttons still win the responder because the touch target is asked first
     <View
+      {...panHandlers}
       style={[
         styles.root,
         landscape ? styles.rootLandscape : styles.rootPortrait,

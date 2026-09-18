@@ -3,7 +3,9 @@ import { PanResponder, Platform } from 'react-native';
 
 import { Direction } from '../game/logic';
 
-const SWIPE_THRESHOLD = 18;
+const SWIPE_DISTANCE = 12;
+/** a fast flick can travel very little distance, so velocity counts too */
+const SWIPE_VELOCITY = 0.25;
 
 /**
  * Swipe gestures plus arrow keys on web, matching the Unity input map.
@@ -19,12 +21,18 @@ export function useControls(onMove: (direction: Direction) => void) {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+        // don't let anything steal a swipe half way through
+        onPanResponderTerminationRequest: () => false,
         onPanResponderRelease: (_event, gesture) => {
-          const { dx, dy } = gesture;
-          if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) {
+          const { dx, dy, vx, vy } = gesture;
+          const horizontal = Math.abs(dx) > Math.abs(dy);
+          const distance = horizontal ? Math.abs(dx) : Math.abs(dy);
+          const velocity = Math.abs(horizontal ? vx : vy);
+
+          if (distance < SWIPE_DISTANCE && velocity < SWIPE_VELOCITY) {
             return;
           }
-          if (Math.abs(dx) > Math.abs(dy)) {
+          if (horizontal) {
             callback.current(dx > 0 ? 'right' : 'left');
           } else {
             callback.current(dy > 0 ? 'down' : 'up');
