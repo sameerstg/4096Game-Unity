@@ -1,0 +1,30 @@
+{
+  "name": "expo-4096",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.15",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.23",
+    "expo-audio": "~57.0.5",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test:logic": "tsc --ignoreConfig src/game/logic.ts src/game/config.ts --outDir .logic-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node scripts/test-logic.js"
+  },
+  "private": true
+}

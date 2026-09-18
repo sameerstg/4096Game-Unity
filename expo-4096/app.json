@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "4096",
+    "slug": "expo-4096",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#19E5FF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sameerstg.game4096"
+    },
+    "android": {
+      "package": "com.sameerstg.game4096",
+      "adaptiveIcon": {
+        "backgroundColor": "#19E5FF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
