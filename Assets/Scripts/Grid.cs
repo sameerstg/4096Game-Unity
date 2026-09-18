@@ -34,6 +34,9 @@ public class Grid : MonoBehaviour
     public AudioClip matchSound, loseSound, winSound, elseSound;
     public Button music,retry;
     private float size;
+    private RectTransform canvasRect;
+    private int lastScreenW, lastScreenH;
+    private bool rebuildQueued;
 
     [ContextMenu("Delete")]
     public void DeleteData()
@@ -43,12 +46,16 @@ public class Grid : MonoBehaviour
     private void Awake()
     {
         _instance = this;
+        canvasRect = (RectTransform)parent.GetComponentInParent<Canvas>().rootCanvas.transform;
+        lastScreenW = Screen.width;
+        lastScreenH = Screen.height;
         auSource =Camera.main.GetComponent<AudioSource>();
         staticColors = colors;
         inputSystem = new InputSystem();
     }
     private IEnumerator Start()
     {
+        MakeUiResponsive();
         retry.onClick.AddListener(() => { StartNewGame(); });
         if (PlayerPrefs.GetString("music")=="0")
         {
@@ -93,6 +100,81 @@ public class Grid : MonoBehaviour
 
     }
     
+
+    void MakeUiResponsive()
+    {
+        // texts fit their rects on any screen instead of using a fixed point size
+        foreach (var text in new[] { gameStateText, currentText, highestText })
+        {
+            text.enableAutoSizing = true;
+        }
+        if (drop.captionText != null)
+        {
+            drop.captionText.enableAutoSizing = true;
+        }
+        if (drop.itemText != null)
+        {
+            drop.itemText.enableAutoSizing = true;
+        }
+
+    }
+
+    IEnumerator FitHeaderRows()
+    {
+        // wait for the layout groups and safe area to settle
+        yield return null;
+        Canvas.ForceUpdateCanvases();
+
+        var safeAreaGroup = music.GetComponentInParent<VerticalLayoutGroup>();
+        if (safeAreaGroup == null)
+        {
+            yield break;
+        }
+        var safeArea = (RectTransform)safeAreaGroup.transform;
+        float available = safeArea.rect.width;
+
+        // header rows have fixed design widths; scale them down on narrower screens
+        foreach (RectTransform row in safeArea)
+        {
+            if (row.rect.width <= 0)
+            {
+                continue;
+            }
+            float scale = Mathf.Min(1f, available / row.rect.width);
+            row.localScale = new Vector3(scale, scale, 1);
+        }
+    }
+
+    private void Update()
+    {
+        // rebuild the board when resolution or orientation changes
+        if (!rebuildQueued && (Screen.width != lastScreenW || Screen.height != lastScreenH))
+        {
+            rebuildQueued = true;
+            StartCoroutine(RebuildAfterResize());
+        }
+    }
+
+    IEnumerator RebuildAfterResize()
+    {
+        // wait until the size stops changing (e.g. window being dragged)
+        int w, h;
+        do
+        {
+            w = Screen.width;
+            h = Screen.height;
+            yield return new WaitForSecondsRealtime(0.25f);
+        }
+        while (w != Screen.width || h != Screen.height);
+
+        lastScreenW = Screen.width;
+        lastScreenH = Screen.height;
+        rebuildQueued = false;
+        if (tiles != null)
+        {
+            StartNewGame(true);
+        }
+    }
 
     private void OnChange()
     {
@@ -388,7 +470,7 @@ public class Grid : MonoBehaviour
     }
        void StartNewGame(bool loadPrevGame = false)
     {
-     
+        StartCoroutine(FitHeaderRows());
 
         score = 0;
         highestScore = PlayerPrefs.GetInt($"{drop.value}");
@@ -416,7 +498,11 @@ public class Grid : MonoBehaviour
 
             sizeOfGrid = 6;
         }
-         size = 1000 / (sizeOfGrid+1);
+        // fit the board to the current canvas: full width on portrait,
+        // limited by height on landscape / short screens
+        Canvas.ForceUpdateCanvases();
+        float boardSpan = Mathf.Min(canvasRect.rect.width * 0.95f, canvasRect.rect.height * 0.55f);
+        size = boardSpan / (sizeOfGrid + 1);
         //Debug.Log(size);
 
          tilePrefab.GetComponent<RectTransform>().sizeDelta = new Vector2(size, size);
@@ -658,16 +744,11 @@ public class Piece
 
 
         this.value = value;
-        if (value == 0)
+        SetText();
+        if (value != 0)
         {
-            gameObject.GetComponentInChildren<TextMeshProUGUI>().text = "";
-
+            SetColor();
         }
-        else
-        {
-
-            gameObject.GetComponentInChildren<TextMeshProUGUI>().text = value.ToString();
-            SetColor();        }
     }
     public bool SetPosition()
     {
@@ -676,8 +757,8 @@ public class Piece
         
         //worldPosition = gameObject.transform.position;
         value += value;
-        
-        gameObject.GetComponentInChildren<TextMeshProUGUI>().text = value.ToString();
+
+        SetText();
 
         SetColor();
         if (value.ToString() == Grid.winNum)
@@ -685,6 +766,14 @@ public class Piece
             return true;
         }
         return false;
+    }
+    void SetText()
+    {
+        var text = gameObject.GetComponentInChildren<TextMeshProUGUI>();
+        text.enableAutoSizing = true;
+        // prefab caps auto-size at 72pt, too small for big tiles on large screens
+        text.fontSizeMax = 500;
+        text.text = value == 0 ? "" : value.ToString();
     }
     void SetColor()
     {
