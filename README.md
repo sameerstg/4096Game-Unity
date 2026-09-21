@@ -16,10 +16,36 @@ npm start          # dev server, then press a / i / w for Android / iOS / web
 Individual targets:
 
 ```bash
-npm run android
+npm run android    # native build, installed on a connected device
 npm run ios
 npm run web
 ```
+
+## Building an APK for a phone
+
+The native `android/` project is generated from `app.json` and is not
+committed, so regenerate it before building:
+
+```bash
+npx expo prebuild --platform android
+cd android
+./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+Drop `-PreactNativeArchitectures` to build for every CPU type. The release APK
+is signed with the debug key, which is fine for installing on your own devices
+but not for Google Play: the store needs an app bundle (`./gradlew
+bundleRelease`) signed with your upload key.
+
+To release a new version, raise `version` and `android.versionCode` in
+`app.json`. The version code must be higher than any build ever uploaded to
+Play, including rejected ones.
+
+`app.json` configures `expo-audio` without microphone access or background
+playback. The game only plays sound in the foreground, and leaving the plugin
+defaults on would add `RECORD_AUDIO` and a foreground-service permission that
+Play asks you to justify.
 
 ## What came over from the Unity build
 

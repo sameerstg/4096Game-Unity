@@ -2,17 +2,25 @@
   "expo": {
     "name": "4096",
     "slug": "expo-4096",
-    "version": "1.0.0",
+    "version": "0.4",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "backgroundColor": "#19E5FF",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.sameerstg.game4096"
+      "bundleIdentifier": "com.sameerstg.game4096",
+      "buildNumber": "4"
     },
     "android": {
       "package": "com.sameerstg.game4096",
+      "versionCode": 4,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#19E5FF",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,6 +31,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
+    ]
   }
 }

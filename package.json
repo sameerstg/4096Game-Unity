@@ -20,8 +20,8 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test:logic": "tsc --ignoreConfig src/game/logic.ts src/game/config.ts --outDir .logic-build --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node scripts/test-logic.js"
