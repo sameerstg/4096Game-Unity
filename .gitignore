@@ -43,7 +43,12 @@ yarn-error.*
 # logic test build output
 .logic-build/
 
-# Left on disk by the Unity project on the `unity` branch
+# Left on disk by the Unity project on the `unity` branch. Unity Hub also
+# recreates ProjectSettings/ and UserSettings/ while this folder is in its
+# project list. Assets/ is deliberately absent: on Windows it would also match
+# the Expo assets/ folder.
+/ProjectSettings/
+/UserSettings/
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
