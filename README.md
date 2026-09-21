@@ -51,31 +51,35 @@ The Unity project signed with `C:/Users/stg/Downloads/user (1).keystore`
 Google to reset the upload key.
 
 `plugins/withReleaseSigning.js` wires the key into the generated
-`android/app/build.gradle` from four Gradle properties. They live in
-`~/.gradle/gradle.properties`, outside the repository, so the passwords are
-never committed:
+`android/app/build.gradle` from four Gradle properties. The keystore path and
+alias live in `~/.gradle/gradle.properties`, outside the repository:
 
 ```properties
 GAME4096_UPLOAD_STORE_FILE=C:/Users/stg/Downloads/user (1).keystore
 GAME4096_UPLOAD_KEY_ALIAS=2048
-GAME4096_UPLOAD_STORE_PASSWORD=...
-GAME4096_UPLOAD_KEY_PASSWORD=...
 ```
 
-Then build the bundle:
+Then run:
 
 ```bash
-npx expo prebuild --platform android
-cd android
-./gradlew app:bundleRelease
+bash scripts/build-aab.sh
 ```
 
-It's written to `android/app/build/outputs/bundle/release/app-release.aab`.
-Building a bundle without all four properties fails straight away rather than
-falling back to the debug key, which Play would reject. To check which key
-signed a bundle, compare the SHA-1 from `keytool -printcert -jarfile
-app-release.aab` with the upload key certificate on the Play Console's App
-integrity page.
+It asks for the keystore password, so the password is never written to disk,
+builds the bundle, and prints the signing certificate's SHA-1. Compare that
+with the upload key certificate on the Play Console's App integrity page before
+uploading. The bundle is written to
+`android/app/build/outputs/bundle/release/app-release.aab`.
+
+The script builds for 32- and 64-bit ARM, which covers every Android phone.
+x86 only matters for emulators and a few Chromebooks (the Unity build shipped
+64-bit ARM alone), and leaving it out halves the native compile, which can
+otherwise run a 16 GB machine out of memory.
+
+To build without the prompt, add `GAME4096_UPLOAD_STORE_PASSWORD` and
+`GAME4096_UPLOAD_KEY_PASSWORD` to `~/.gradle/gradle.properties` as well. Either
+way, building a bundle without all four properties fails straight away rather
+than falling back to the debug key, which Play would reject.
 
 To release a new version, raise `version` and `android.versionCode` in
 `app.json`. The version code must be higher than any build ever uploaded to
