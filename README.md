@@ -33,10 +33,49 @@ cd android
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-Drop `-PreactNativeArchitectures` to build for every CPU type. The release APK
-is signed with the debug key, which is fine for installing on your own devices
-but not for Google Play: the store needs an app bundle (`./gradlew
-bundleRelease`) signed with your upload key.
+Drop `-PreactNativeArchitectures` to build for every CPU type. A release APK
+is signed with the debug key unless the upload key is configured (below), which
+is fine for installing on your own devices.
+
+The package is `com.Sameerstg.numberPuzzleGame`, the same as the Unity game's
+Play listing, so this build replaces it there. A phone that already has the
+Play version installed won't accept a locally signed APK over it, because the
+signatures differ; uninstall that version first, or test through a Play testing
+track instead.
+
+## Building an app bundle for Google Play
+
+Play only accepts an app bundle (`.aab`) signed with the listing's upload key.
+The Unity project signed with `C:/Users/stg/Downloads/user (1).keystore`
+(alias `2048`); keep a backup of that file, because losing it means asking
+Google to reset the upload key.
+
+`plugins/withReleaseSigning.js` wires the key into the generated
+`android/app/build.gradle` from four Gradle properties. They live in
+`~/.gradle/gradle.properties`, outside the repository, so the passwords are
+never committed:
+
+```properties
+GAME4096_UPLOAD_STORE_FILE=C:/Users/stg/Downloads/user (1).keystore
+GAME4096_UPLOAD_KEY_ALIAS=2048
+GAME4096_UPLOAD_STORE_PASSWORD=...
+GAME4096_UPLOAD_KEY_PASSWORD=...
+```
+
+Then build the bundle:
+
+```bash
+npx expo prebuild --platform android
+cd android
+./gradlew app:bundleRelease
+```
+
+It's written to `android/app/build/outputs/bundle/release/app-release.aab`.
+Building a bundle without all four properties fails straight away rather than
+falling back to the debug key, which Play would reject. To check which key
+signed a bundle, compare the SHA-1 from `keytool -printcert -jarfile
+app-release.aab` with the upload key certificate on the Play Console's App
+integrity page.
 
 To release a new version, raise `version` and `android.versionCode` in
 `app.json`. The version code must be higher than any build ever uploaded to
@@ -112,9 +151,8 @@ exactly once.
 ## Notes
 
 - `app.json` sets `orientation: "default"`; the layout handles rotation live.
-- `android.package` / `ios.bundleIdentifier` are `com.sameerstg.game4096`.
-  Change these before shipping if the app should replace the existing Unity
-  listing (`com.Sameerstg.numberPuzzleGame`) rather than sit beside it.
+- Scores saved by the Unity version aren't carried over: it stored them in
+  Unity's `PlayerPrefs`, which this app can't read.
 - New tiles are always `2`, as in the Unity original. A new game deals two
   tiles rather than one.
 

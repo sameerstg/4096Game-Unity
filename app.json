@@ -13,7 +13,7 @@
       "buildNumber": "4"
     },
     "android": {
-      "package": "com.sameerstg.game4096",
+      "package": "com.Sameerstg.numberPuzzleGame",
       "versionCode": 4,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -41,7 +41,8 @@
           "enableBackgroundPlayback": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      "./plugins/withReleaseSigning"
     ]
   }
 }
