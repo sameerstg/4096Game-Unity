@@ -1,12 +1,14 @@
 # 4096 — Expo / React Native
 
-A port of the Unity `4096Game-Unity` project in this repository to Expo (SDK 57,
-React Native 0.86).
+The 4096 game on Expo (SDK 57, React Native 0.86).
+
+This started as a port of the original Unity game. The Unity project is no
+longer on `main`; it lives on the `unity` branch, together with the history of
+this port.
 
 ## Running it
 
 ```bash
-cd expo-4096
 npm install
 npm start          # dev server, then press a / i / w for Android / iOS / web
 ```
@@ -33,7 +35,8 @@ npm run web
 | iTween tile slide and win banner scale-up | `Animated` slide, pop-in, merge bounce, banner |
 | Result banner, 2s pause, auto new game | `RESULT_PAUSE` in `App.tsx` |
 
-Sounds were transcoded from the Unity `Assets/Sounds` WAVs to AAC, taking the
+Sounds were transcoded from the Unity `Assets/Sounds` WAVs (on the `unity`
+branch) to AAC, taking the
 audio payload from 8.9 MB to about 420 KB.
 
 ## Layout
