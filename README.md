@@ -51,15 +51,15 @@ Play asks you to justify.
 
 | Unity | Here |
 | --- | --- |
-| Win-target dropdown (2048 / 4096 / 8192 / 16384) | Mode chips, same four targets |
+| Win-target dropdown (2048 / 4096 / 8192 / 16384) | Goal picker, same four targets |
 | Grid size per target (4×4, 5×5, 5×5, 6×6) | `MODES` in `src/game/config.ts` |
-| `GridGenerator` tile colour list | `TILE_COLORS`, same 14 values |
+| `GridGenerator` tile colour list | Replaced by a new palette (see below) |
 | Score + per-mode high score in `PlayerPrefs` | Per-mode keys in AsyncStorage |
 | Board auto-save / restore per target | `serialize` / `deserialize` + AsyncStorage |
 | Swipe and arrow-key input | `PanResponder`, plus arrow/WASD keys on web |
 | Match / move / win / lose sounds, music toggle | `expo-audio`, same clips as AAC |
-| iTween tile slide and win banner scale-up | `Animated` slide, pop-in, merge bounce, banner |
-| Result banner, 2s pause, auto new game | `RESULT_PAUSE` in `App.tsx` |
+| iTween tile slide | `Animated` slide, pop-in and merge bounce |
+| Result banner, 2s pause, auto new game | A dialog that waits for the player (see below) |
 
 Sounds were transcoded from the Unity `Assets/Sounds` WAVs (on the `unity`
 branch) to AAC, taking the
@@ -77,8 +77,37 @@ resolution, so it fits any screen:
 - Type and control sizes scale from the shorter screen edge, clamped so they
   stay legible on small phones and don't balloon on tablets.
 - Safe-area insets are applied on all four edges.
-- Tile label colour is chosen per tile from its background luminance, so the
-  bright cyan and yellow tiles stay readable.
+- When the board leaves spare room, the header and controls slide toward it
+  so they stay together as one group instead of floating apart.
+
+## Look and feel
+
+A bright hyper-casual style: a sky-to-lilac gradient, white cards, the rounded
+Fredoka font, and chunky candy tiles that sit on a darker lip of their own
+colour. Everything visual lives in `src/game/config.ts`.
+
+- **Tile colours** travel round the wheel from teal (2) to gold (2048), so
+  bigger tiles read as warmer. The goal tiles past 2048 are glowing "jewels"
+  that break the pattern on purpose. The 2 and 4 tiles, compared most often,
+  are in different colour families.
+- **Numbers** are white until 128 and dark from 256, switching once, wherever
+  white still meets the 3:1 large-text contrast bar.
+- **The goal picker** fills the chosen goal with that goal tile's own colour,
+  so you can see which tile you're chasing.
+
+`npm run test:logic` guards these: neighbouring tiles must be at least 15 ΔE
+apart, every number must reach 3:1 contrast, and the text colour must switch
+exactly once.
+
+## Game flow
+
+- Each merge shows a floating `+N` on the score.
+- Reaching the goal opens a dialog over the finished board: **Keep going**
+  carries on past the goal (and won't ask again), **New game** starts over.
+- Running out of moves shows the score, the best score and your highest tile,
+  and waits for **Try again**.
+- The new-game button asks first if there's a scored game in progress. Swipes
+  are ignored while any dialog is open.
 
 ## Notes
 

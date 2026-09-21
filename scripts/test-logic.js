@@ -1,4 +1,5 @@
 const L = require('../.logic-build/logic.js');
+const C = require('../.logic-build/config.js');
 
 let pass = 0;
 const failures = [];
@@ -180,6 +181,81 @@ check('missing board is rejected', L.deserialize(null, mode), null);
 check('empty board is rejected', L.deserialize({ size: 5, score: 0, cells: [] }, mode), null);
 check('out of range cell is rejected', L.deserialize({ size: 5, score: 0, cells: [{ value: 2, row: 9, col: 0 }] }, mode), null);
 check('garbage value is rejected', L.deserialize({ size: 5, score: 0, cells: [{ value: 0, row: 0, col: 0 }] }, mode), null);
+
+// --- keep playing past the goal -----------------------------------------
+check('new game is not in keep-playing mode', L.createGame(mode).keepPlaying, false);
+check('max tile of a board', L.maxTile(stateFrom([[2, 64, 0, 0], [8, 0, 0, 0], Z, Z])), 64);
+check('max tile of an empty board', L.maxTile(stateFrom([Z, Z, Z, Z])), 0);
+
+const continuing = { ...stateFrom([[4096, 2, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 4096), keepPlaying: true };
+check('keep-playing survives a save', L.deserialize(L.serialize(continuing), mode).keepPlaying, true);
+check('not keep-playing survives a save', L.deserialize(L.serialize({ ...continuing, keepPlaying: false }), mode).keepPlaying, false);
+
+const legacyWithGoal = { size: 5, score: 9000, cells: [{ value: 4096, row: 0, col: 0 }, { value: 2, row: 0, col: 1 }] };
+const legacyWithoutGoal = { size: 5, score: 100, cells: [{ value: 64, row: 0, col: 0 }] };
+check('old save holding the goal tile resumes in keep-playing', L.deserialize(legacyWithGoal, mode).keepPlaying, true);
+check('old save below the goal does not', L.deserialize(legacyWithoutGoal, mode).keepPlaying, false);
+
+// --- colour ramp --------------------------------------------------------
+function lum(hex) {
+  const h = hex.replace('#', '');
+  const ch = (o) => {
+    const s = parseInt(h.slice(o, o + 2), 16) / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * ch(0) + 0.7152 * ch(2) + 0.0722 * ch(4);
+}
+const rampValues = Object.keys(C.TILE_COLORS).map(Number).sort((a, b) => a - b);
+check('ramp covers 2 to 16384', [rampValues.length, rampValues[0], rampValues[rampValues.length - 1]], [14, 2, 16384]);
+
+function lab(hex) {
+  const h = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((o) => {
+    const s = parseInt(h.slice(o, o + 2), 16) / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047);
+  const y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
+  const z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+// ΔE76 of about 2 is the smallest difference the eye notices; tiles you are
+// deciding whether to merge need to be far apart.
+let closestPair = Infinity;
+for (let i = 1; i < rampValues.length; i++) {
+  const [a, b] = [lab(C.tileColor(rampValues[i - 1])), lab(C.tileColor(rampValues[i]))];
+  const distance = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  if (distance < 15) {
+    failures.push(`tiles ${rampValues[i - 1]} and ${rampValues[i]} are only ${distance.toFixed(1)} ΔE apart`);
+  }
+  closestPair = Math.min(closestPair, distance);
+}
+check('neighbouring tiles are clearly distinguishable', closestPair >= 15, true);
+console.log(`closest neighbouring tiles: ${closestPair.toFixed(1)} ΔE`);
+
+let worstContrast = Infinity;
+let worstTile = 0;
+for (const value of [...rampValues, 32768]) {
+  const a = lum(C.tileColor(value));
+  const b = lum(C.tileTextColor(value));
+  const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  if (ratio < worstContrast) {
+    worstContrast = ratio;
+    worstTile = value;
+  }
+}
+// tile numbers are large bold text, where WCAG AA asks for 3:1
+if (worstContrast < 3) {
+  failures.push(`tile ${worstTile} text contrast is only ${worstContrast.toFixed(2)}:1`);
+}
+check('every tile number has at least 3:1 contrast', worstContrast >= 3, true);
+
+const inks = rampValues.map((value) => C.tileTextColor(value));
+const switches = inks.filter((ink, i) => i > 0 && ink !== inks[i - 1]).length;
+check('tile text goes from white to dark exactly once', [inks[0], switches, inks[inks.length - 1]], ['#FFFFFF', 1, C.THEME.darkText]);
+console.log(`text turns dark from tile ${rampValues[inks.findIndex((ink) => ink !== '#FFFFFF')]}`);
+console.log(`lowest tile text contrast: ${worstContrast.toFixed(2)}:1 (tile ${worstTile})`);
 
 // --- report -------------------------------------------------------------
 console.log(`passed: ${pass}`);

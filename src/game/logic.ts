@@ -24,6 +24,8 @@ export type GameState = {
   score: number;
   status: Status;
   nextId: number;
+  /** the player chose to carry on after reaching the goal */
+  keepPlaying: boolean;
 };
 
 export type MoveResult = {
@@ -45,6 +47,10 @@ const SPAWN_VALUE = 2;
 
 export function liveTiles(state: GameState): Tile[] {
   return state.tiles.filter((tile) => !tile.removed);
+}
+
+export function maxTile(state: GameState): number {
+  return liveTiles(state).reduce((best, tile) => Math.max(best, tile.value), 0);
 }
 
 function occupiedKeys(state: GameState): Set<number> {
@@ -85,6 +91,7 @@ export function createGame(mode: Mode): GameState {
     score: 0,
     status: 'playing',
     nextId: 1,
+    keepPlaying: false,
   };
   return spawnTile(spawnTile(empty));
 }
@@ -210,6 +217,7 @@ export type SavedBoard = {
   size: number;
   score: number;
   cells: Array<{ value: number; row: number; col: number }>;
+  keepPlaying?: boolean;
 };
 
 export function serialize(state: GameState): SavedBoard {
@@ -217,6 +225,7 @@ export function serialize(state: GameState): SavedBoard {
     size: state.size,
     score: state.score,
     cells: liveTiles(state).map(({ value, row, col }) => ({ value, row, col })),
+    keepPlaying: state.keepPlaying,
   };
 }
 
@@ -255,5 +264,11 @@ export function deserialize(saved: SavedBoard | null, mode: Mode): GameState | n
     score: Number.isFinite(saved.score) ? saved.score : 0,
     status: 'playing',
     nextId,
+    // Older saves lack the flag; a saved board that already holds the goal
+    // tile can only come from a player who chose to keep going.
+    keepPlaying:
+      typeof saved.keepPlaying === 'boolean'
+        ? saved.keepPlaying
+        : saved.cells.some((cell) => cell.value >= mode.target),
   };
 }

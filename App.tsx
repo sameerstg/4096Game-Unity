@@ -1,23 +1,31 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+  Fredoka_400Regular,
+  Fredoka_500Medium,
+  Fredoka_600SemiBold,
+  Fredoka_700Bold,
+  useFonts,
+} from '@expo-google-fonts/fredoka';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Board } from './src/components/Board';
-import { Controls } from './src/components/Controls';
-import { Overlay } from './src/components/Overlay';
-import { ScoreBar } from './src/components/ScoreBar';
+import { Dialog } from './src/components/Dialog';
+import { GoalPicker } from './src/components/GoalPicker';
+import { Header } from './src/components/Header';
+import { Gain, ScoreBar } from './src/components/ScoreBar';
+import { TileFace } from './src/components/TileFace';
 import { MOVE_DURATION } from './src/components/TileView';
-import { COLORS, MODES } from './src/game/config';
+import { MODES, THEME } from './src/game/config';
 import {
   createGame,
   deserialize,
   Direction,
   GameState,
   hasMoves,
+  maxTile,
   move,
   serialize,
   settle,
@@ -37,9 +45,6 @@ import {
 import { useControls } from './src/hooks/useControls';
 import { useSounds } from './src/hooks/useSounds';
 
-/** Matches the Unity banner: show the result, then deal a new board. */
-const RESULT_PAUSE = 2000;
-
 function Game() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -49,16 +54,21 @@ function Game() {
   const [best, setBest] = useState(0);
   const [musicOn, setMusicOn] = useState(true);
   const [area, setArea] = useState({ width: 0, height: 0 });
+  const [gain, setGain] = useState<Gain | null>(null);
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
 
   const gameRef = useRef<GameState | null>(null);
   gameRef.current = game;
   const modeIndexRef = useRef<number | null>(null);
   modeIndexRef.current = modeIndex;
+  const confirmingRef = useRef(false);
+  confirmingRef.current = confirmingRestart;
   const busy = useRef(false);
   /** one swipe made mid-animation, replayed when the turn finishes */
   const pending = useRef<Direction | null>(null);
   const moveRef = useRef<((direction: Direction) => void) | null>(null);
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const gainId = useRef(0);
 
   const sounds = useSounds(musicOn);
 
@@ -147,20 +157,20 @@ function Game() {
     void saveBoard(mode.target, serialize(fresh));
   }, [commitState]);
 
-  const finish = useCallback(
-    (state: GameState, status: 'won' | 'lost') => {
+  const lose = useCallback(
+    (state: GameState) => {
+      sounds.playLose();
       pending.current = null;
-      commitState({ ...state, status });
+      commitState({ ...state, status: 'lost' });
       void clearBoard(state.target);
-      schedule(startFresh, RESULT_PAUSE);
     },
-    [commitState, schedule, startFresh]
+    [commitState, sounds]
   );
 
   const handleMove = useCallback(
     (direction: Direction) => {
       const current = gameRef.current;
-      if (!current || current.status !== 'playing') {
+      if (!current || current.status !== 'playing' || confirmingRef.current) {
         return;
       }
       // mid-animation: remember the swipe instead of dropping it
@@ -176,7 +186,10 @@ function Game() {
 
       busy.current = true;
       commitState(result.state);
-      if (result.merges > 0) {
+      const gained = result.state.score - current.score;
+      if (gained > 0) {
+        gainId.current += 1;
+        setGain({ amount: gained, id: gainId.current });
         sounds.playMatch();
       } else {
         sounds.playMove();
@@ -185,9 +198,11 @@ function Game() {
       schedule(() => {
         const settled = settle(result.state);
 
-        if (result.reachedTarget) {
+        // The board stays up behind the dialog; the player decides what's next.
+        if (result.reachedTarget && !current.keepPlaying) {
           sounds.playWin();
-          finish(settled, 'won');
+          pending.current = null;
+          commitState({ ...settled, status: 'won' });
           return;
         }
 
@@ -195,8 +210,7 @@ function Game() {
         commitState(next);
 
         if (!hasMoves(next)) {
-          sounds.playLose();
-          finish(next, 'lost');
+          lose(next);
           return;
         }
 
@@ -210,12 +224,28 @@ function Game() {
         }
       }, MOVE_DURATION + 40);
     },
-    [commitState, finish, schedule, sounds]
+    [commitState, lose, schedule, sounds]
   );
 
   moveRef.current = handleMove;
 
   const panHandlers = useControls(handleMove);
+
+  const keepGoing = useCallback(() => {
+    const current = gameRef.current;
+    if (!current) {
+      return;
+    }
+    // the winning move hasn't dealt its tile yet
+    const next = spawnTile({ ...current, status: 'playing', keepPlaying: true });
+    if (!hasMoves(next)) {
+      lose(next);
+      return;
+    }
+    commitState(next);
+    busy.current = false;
+    void saveBoard(next.target, serialize(next));
+  }, [commitState, lose]);
 
   const selectMode = useCallback(
     (index: number) => {
@@ -239,8 +269,19 @@ function Game() {
   const restart = useCallback(() => {
     clearTimers();
     pending.current = null;
+    setConfirmingRestart(false);
     startFresh();
   }, [clearTimers, startFresh]);
+
+  /** Only ask when there's a game worth losing. */
+  const requestNewGame = useCallback(() => {
+    const current = gameRef.current;
+    if (current && current.status === 'playing' && current.score > 0) {
+      setConfirmingRestart(true);
+    } else {
+      restart();
+    }
+  }, [restart]);
 
   const toggleMusic = useCallback(() => {
     setMusicOn((previous) => {
@@ -260,19 +301,35 @@ function Game() {
   const unit = Math.max(13, Math.min(30, Math.min(width, height) * 0.055));
   const boardSize = Math.floor(Math.min(area.width, area.height));
   const landscape = width > height;
+  const mode = MODES[modeIndex ?? 0];
+  const bestTile = game ? maxTile(game) : 0;
+  const score = game?.score ?? 0;
 
+  // The board sits centred in its area, so the controls would float apart from
+  // it. Slide them by half the spare room to keep controls and board together.
+  // A transform doesn't change layout, so this can't feed back into `area`.
+  const spare = Math.max(0, (landscape ? area.width : area.height) - boardSize);
+  const groupShift = landscape
+    ? { transform: [{ translateX: spare / 2 }] }
+    : { transform: [{ translateY: spare / 2 }] };
+
+  const header = (
+    <Header
+      unit={unit}
+      musicOn={musicOn}
+      onToggleMusic={toggleMusic}
+      onNewGame={requestNewGame}
+    />
+  );
   const hud = (
     <>
-      <ScoreBar score={game?.score ?? 0} best={best} unit={unit} vertical={landscape} />
-      <Controls
+      <ScoreBar score={score} best={best} unit={unit} vertical={landscape} gain={gain} />
+      <GoalPicker
         modes={MODES}
         activeIndex={modeIndex ?? 0}
-        onSelectMode={selectMode}
-        musicOn={musicOn}
-        onToggleMusic={toggleMusic}
-        onRestart={restart}
+        onSelect={selectMode}
         unit={unit}
-        stacked={landscape}
+        wrap={landscape}
       />
     </>
   );
@@ -286,64 +343,128 @@ function Game() {
     </View>
   );
 
+  let dialog = null;
+  if (game?.status === 'won') {
+    dialog = (
+      <Dialog
+        unit={unit}
+        hero={<TileFace value={mode.target} size={unit * 4.6} />}
+        title={`You made ${mode.target.toLocaleString()}!`}
+        message={`Score ${score.toLocaleString()}. Keep going for an even bigger tile, or start a fresh board.`}
+        actions={[
+          { label: 'Keep going', onPress: keepGoing, primary: true },
+          { label: 'New game', onPress: restart },
+        ]}
+      />
+    );
+  } else if (game?.status === 'lost') {
+    const newBest = score > 0 && score >= best;
+    dialog = (
+      <Dialog
+        unit={unit}
+        hero={bestTile > 0 ? <TileFace value={bestTile} size={unit * 3.6} /> : undefined}
+        title="No moves left"
+        message={
+          newBest
+            ? `You scored ${score.toLocaleString()}, a new best!`
+            : `You scored ${score.toLocaleString()}. Your best is ${best.toLocaleString()}.`
+        }
+        actions={[{ label: 'Try again', onPress: restart, primary: true }]}
+      />
+    );
+  } else if (confirmingRestart) {
+    dialog = (
+      <Dialog
+        unit={unit}
+        title="Start a new game?"
+        message={`This board and its score of ${score.toLocaleString()} will be lost.`}
+        actions={[
+          { label: 'Start new game', onPress: restart, primary: true },
+          { label: 'Keep playing', onPress: () => setConfirmingRestart(false) },
+        ]}
+      />
+    );
+  }
+
   return (
-    // swipes are handled on the root so the HUD area is not a dead zone;
-    // buttons still win the responder because the touch target is asked first
-    <View
-      {...panHandlers}
-      style={[
-        styles.root,
-        landscape ? styles.rootLandscape : styles.rootPortrait,
-        {
-          paddingTop: insets.top + unit * 0.5,
-          paddingBottom: insets.bottom + unit * 0.5,
-          paddingLeft: insets.left + unit * 0.6,
-          paddingRight: insets.right + unit * 0.6,
-          gap: unit * 0.55,
-        },
-      ]}
-    >
-      {landscape ? (
-        <View
-          style={[
-            styles.sidebar,
-            { gap: unit * 0.55, width: Math.min(300, width * 0.36) },
-          ]}
-        >
-          {hud}
-        </View>
-      ) : (
-        hud
-      )}
+    <View style={styles.fill}>
+      {/* swipes are handled here so the HUD area is not a dead zone;
+          buttons still win the responder because the touch target is asked first */}
+      <View
+        {...panHandlers}
+        style={[
+          styles.fill,
+          landscape ? styles.row : styles.column,
+          {
+            paddingTop: insets.top + unit * 0.6,
+            paddingBottom: insets.bottom + unit * 0.5,
+            paddingLeft: insets.left + unit * 0.7,
+            paddingRight: insets.right + unit * 0.7,
+            gap: unit * 0.7,
+          },
+        ]}
+      >
+        {landscape ? (
+          <>
+            <View
+              style={[
+                styles.sidebar,
+                { gap: unit * 0.7, width: Math.min(320, width * 0.38) },
+                groupShift,
+              ]}
+            >
+              {header}
+              {hud}
+            </View>
+            {boardPane}
+          </>
+        ) : (
+          <>
+            <View style={[{ gap: unit * 0.7 }, groupShift]}>
+              {header}
+              {hud}
+            </View>
+            {boardPane}
+          </>
+        )}
+      </View>
 
-      {boardPane}
-
-      {game && game.status !== 'playing' ? (
-        <Overlay status={game.status} unit={unit} />
-      ) : null}
-
+      {dialog}
       <StatusBar style="dark" />
     </View>
   );
 }
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Fredoka_400Regular,
+    Fredoka_500Medium,
+    Fredoka_600SemiBold,
+    Fredoka_700Bold,
+  });
+
   return (
     <SafeAreaProvider>
-      <Game />
+      <LinearGradient
+        colors={[THEME.backgroundTop, THEME.backgroundMiddle, THEME.backgroundBottom]}
+        locations={[0, 0.45, 1]}
+        style={styles.fill}
+      >
+        {/* a failed font load falls back to the system font rather than a blank screen */}
+        {fontsLoaded || fontError ? <Game /> : null}
+      </LinearGradient>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  fill: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
-  rootPortrait: {
+  column: {
     flexDirection: 'column',
   },
-  rootLandscape: {
+  row: {
     flexDirection: 'row',
   },
   sidebar: {
@@ -352,7 +473,6 @@ const styles = StyleSheet.create({
   },
   boardArea: {
     flex: 1,
-    overflow: 'hidden',
   },
   boardCenter: {
     position: 'absolute',
