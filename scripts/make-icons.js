@@ -19,26 +19,22 @@ const FONT = path
 const INK_DARK = '#2B2464';
 const GRADIENT = 'linear-gradient(160deg, #8EC5FC 0%, #B7B6FC 45%, #E0C3FC 100%)';
 
-// Tiles growing into the goal tile, which is last, largest and in front.
-// size and centre offsets are fractions of the canvas. The tiles behind carry
-// their number in the corner that stays visible past the tile in front.
+// The gold goal tile on its own: one number stays readable at launcher size.
+// size and centre offsets are fractions of the canvas.
 const TILES = [
-  { value: 2, color: '#0E9F94', ink: '#FFFFFF', size: 0.19, x: -0.26, y: -0.27, corner: true, fontScale: 0.4 },
-  { value: 32, color: '#D63FD0', ink: '#FFFFFF', size: 0.28, x: -0.12, y: -0.1, corner: true, fontScale: 0.34 },
-  { value: 2048, color: '#FFD83D', ink: INK_DARK, size: 0.46, x: 0.12, y: 0.1, glow: true },
+  { value: 2048, color: '#FFD83D', ink: INK_DARK, size: 0.62, x: 0, y: -0.015, glow: true },
 ];
 
 const VARIANTS = [
   { file: 'icon.png', size: 1024, scale: 1, background: true },
   // Android crops an adaptive icon's foreground, so hold the artwork inside
-  // the central safe area and leave the gradient to the background layer.
-  // 0.62 keeps the whole cascade, corners included, inside the circle Android
-  // guarantees is visible (the central ~61% of the canvas).
-  { file: 'android-icon-foreground.png', size: 512, scale: 0.62, background: false },
+  // the central area it guarantees is visible (a circle over ~61% of the
+  // canvas) and leave the gradient to the background layer.
+  { file: 'android-icon-foreground.png', size: 512, scale: 0.75, background: false },
   { file: 'android-icon-background.png', size: 512, scale: 0, background: true },
   // Android 13+ themed icons: a flat silhouette the system tints itself.
-  { file: 'android-icon-monochrome.png', size: 512, scale: 0.62, background: false, monochrome: true },
-  { file: 'favicon.png', size: 96, scale: 1.05, background: true },
+  { file: 'android-icon-monochrome.png', size: 512, scale: 0.75, background: false, monochrome: true },
+  { file: 'favicon.png', size: 96, scale: 1.15, background: true },
   { file: 'store-icon.png', size: 512, scale: 1, background: true },
 ];
 
@@ -84,22 +80,26 @@ function tileHtml(tile, canvas, showNumber) {
 }
 
 /**
- * Flat silhouette of the same cascade. Each tile erases a gap out of the one
- * behind it, so the three stay readable once the system floods them with a
- * single colour.
+ * Flat silhouette the system floods with a single colour, so it carries no
+ * colour of its own: the tile is solid and its number is knocked out of it.
+ * With several tiles, each also erases a gap out of the one behind it.
  */
 function monochromeSvg(size, scale) {
   const gap = size * 0.03;
   const shapes = TILES.map((tile, index) => {
     const side = size * tile.size;
-    const left = size / 2 + size * tile.x - side / 2;
-    const top = size / 2 + size * tile.y - side / 2;
+    const centerX = size / 2 + size * tile.x;
+    const centerY = size / 2 + size * tile.y;
+    const left = centerX - side / 2;
+    const top = centerY - side / 2;
     const rect = (inset, fill) =>
       `<rect x="${left - inset}" y="${top - inset}" width="${side + inset * 2}" height="${
         side + inset * 2
       }" rx="${side * 0.2 + inset}" fill="${fill}"/>`;
-    // black cuts the gap, white puts the tile back on top of it
-    return (index > 0 ? rect(gap, '#000') : '') + rect(0, '#fff');
+    const fontSize = side * (tile.fontScale ?? fontScaleFor(tile.value));
+    // black cuts the gap and the number, white paints the tile between them
+    const number = `<text x="${centerX}" y="${centerY}" fill="#000" font-family="Fredoka, sans-serif" font-weight="700" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central">${tile.value}</text>`;
+    return (index > 0 ? rect(gap, '#000') : '') + rect(0, '#fff') + number;
   }).join('');
   const half = size / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
@@ -113,7 +113,10 @@ function monochromeSvg(size, scale) {
 function html({ size, scale, background, monochrome }) {
   if (monochrome) {
     return `<!doctype html><meta charset="utf-8">
-<style>html,body{margin:0;padding:0;width:${size}px;height:${size}px;background:transparent}</style>
+<style>
+  @font-face { font-family: 'Fredoka'; src: url('file:///${FONT}') format('truetype'); font-weight: 700; }
+  html,body{margin:0;padding:0;width:${size}px;height:${size}px;background:transparent}
+</style>
 <body>${monochromeSvg(size, scale)}</body>`;
   }
   // numbers on the small tiles are mush below this size; the goal tile keeps its own

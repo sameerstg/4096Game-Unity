@@ -143,10 +143,12 @@ apart, every number must reach 3:1 contrast, and the text colour must switch
 exactly once.
 
 The app icons come from the same colours and font. `node scripts/make-icons.js`
-renders them with headless Chrome: tiles growing into the gold 2048 goal tile.
-It writes `assets/icon.png`, the two Android adaptive layers, `favicon.png`,
-and `store-icon.png`, the 512×512 image to upload in Play Console. The Android
-foreground is scaled to stay inside the circle launchers may crop to.
+renders them with headless Chrome: the gold 2048 goal tile, alone so its number
+still reads at launcher size. It writes `assets/icon.png`, the three Android
+adaptive layers, `favicon.png`, and `store-icon.png`, the 512×512 image to
+upload in Play Console. The Android layers are scaled to stay inside the circle
+launchers may crop to, and the themed-icon layer knocks the number out of a
+solid tile, since the system floods that layer with one colour.
 
 ## Game flow
 
