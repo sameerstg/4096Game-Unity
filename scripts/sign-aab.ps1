@@ -34,9 +34,17 @@ Write-Output "Signing with $store (alias $aliasName)"
 & "$javaHome\bin\jarsigner.exe" -keystore $store -signedjar $signed $bundle $aliasName
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# Never announce success without checking what actually came out.
+$cert = & "$javaHome\bin\keytool.exe" -printcert -jarfile $signed 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0 -or $cert -notmatch 'SHA1:') {
+    Write-Output 'FAILED: the signed bundle carries no signature.'
+    Write-Output $cert
+    exit 1
+}
+
 Write-Output ""
 Write-Output "Signed bundle: $signed"
 Write-Output "Upload that file to Google Play."
 Write-Output ""
 Write-Output "Check this against Play Console > App integrity > Upload key certificate:"
-& "$javaHome\bin\keytool.exe" -printcert -jarfile $signed | Select-String -Pattern 'SHA1:|Owner:' | Select-Object -First 2
+($cert -split "`n" | Select-String -Pattern 'SHA1:|Owner:' | Select-Object -First 2) -join "`n"

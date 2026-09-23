@@ -24,14 +24,17 @@ npm run web
 ## Building an APK for a phone
 
 The native `android/` project is generated from `app.json` and is not
-committed, so regenerate it before building:
+committed, so regenerate it before building. In PowerShell:
 
-```bash
-npx expo prebuild --platform android
+```powershell
+npx expo prebuild --platform android --no-clean
 cd android
-./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a
-adb install -r app/build/outputs/apk/release/app-release.apk
+.\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a
+adb install -r app\build\outputs\apk\release\app-release.apk
 ```
+
+Use `--no-clean`: a plain `prebuild` deletes `android/` and with it every
+compiled native library, turning a one-minute build into a ten-minute one.
 
 Drop `-PreactNativeArchitectures` to build for every CPU type. A release APK
 is signed with the debug key unless the upload key is configured (below), which
@@ -45,51 +48,59 @@ track instead.
 
 ## Building an app bundle for Google Play
 
-Play only accepts an app bundle (`.aab`) signed with the listing's upload key.
-The Unity project signed with `C:/Users/stg/Downloads/user (1).keystore`
-(alias `2048`); keep a backup of that file, because losing it means asking
-Google to reset the upload key.
+Play only accepts an app bundle (`.aab`) signed with the listing's upload key:
+`F:/2048 user.keystore`, alias `2048`, the same key the Unity build used. Keep
+an offline backup of that file. Losing it means asking Google to reset the
+upload key, and it must never go in this repository, which is public.
 
 `plugins/withReleaseSigning.js` wires the key into the generated
-`android/app/build.gradle` from four Gradle properties. The keystore path and
-alias live in `~/.gradle/gradle.properties`, outside the repository:
+`android/app/build.gradle` from four Gradle properties. They live in
+`~/.gradle/gradle.properties`, outside the repository, so the passwords are
+never committed:
 
 ```properties
-GAME4096_UPLOAD_STORE_FILE=C:/Users/stg/Downloads/user (1).keystore
+GAME4096_UPLOAD_STORE_FILE=F:/2048 user.keystore
 GAME4096_UPLOAD_KEY_ALIAS=2048
+GAME4096_UPLOAD_STORE_PASSWORD=...
+GAME4096_UPLOAD_KEY_PASSWORD=...
 ```
 
-Then run:
+Use forward slashes. Java reads these files with backslash as an escape
+character, so `F:\2048 user.keystore` would arrive as `F:2048 user.keystore`.
 
-```bash
-bash scripts/build-aab.sh
+With all four set, this signs the bundle without asking anything:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-aab.ps1
 ```
 
-It asks for the keystore password, so the password is never written to disk,
-builds the bundle, and prints the signing certificate's SHA-1. Compare that
-with the upload key certificate on the Play Console's App integrity page before
-uploading. The bundle is written to
+If the two passwords are absent it asks once and passes them to that build
+alone, never writing them to disk. Either way it refuses to report success
+unless the finished bundle really carries a non-debug signature, and it prints
+the certificate's SHA-1 to compare against the Play Console's App integrity
+page. The bundle lands in
 `android/app/build/outputs/bundle/release/app-release.aab`.
 
-The script builds for 32- and 64-bit ARM, which covers every Android phone.
+`scripts/build-aab.sh` is the same thing for a real bash shell. Note that on
+this machine `bash` resolves to a WSL stub with no distribution installed, so
+the PowerShell version is the one to use.
+
+The scripts build for 32- and 64-bit ARM, which covers every Android phone.
 x86 only matters for emulators and a few Chromebooks (the Unity build shipped
 64-bit ARM alone), and leaving it out halves the native compile, which can
 otherwise run a 16 GB machine out of memory.
 
-To build without the prompt, add `GAME4096_UPLOAD_STORE_PASSWORD` and
-`GAME4096_UPLOAD_KEY_PASSWORD` to `~/.gradle/gradle.properties` as well. Either
-way, building a bundle without all four properties fails straight away rather
-than falling back to the debug key, which Play would reject.
+Building a bundle with any of the four properties missing fails immediately
+rather than falling back to the debug key, which Play would reject. To build
+one deliberately unsigned and sign it separately, pass
+`-PGAME4096_UNSIGNED_BUNDLE` (`=false` turns it back off), then:
 
-To build the bundle and sign it separately, add `-PGAME4096_UNSIGNED_BUNDLE`.
-That leaves it unsigned, which Play refuses outright, unlike a debug-signed
-bundle that looks finished until it's rejected on upload. Sign it afterwards:
-
-```bash
-"$JAVA_HOME/bin/jarsigner" -keystore "C:/Users/stg/Downloads/user (1).keystore" \
-  -signedjar app-release-signed.aab \
-  android/app/build/outputs/bundle/release/app-release.aab 2048
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sign-aab.ps1
 ```
+
+That runs `jarsigner`, which asks for the password itself, writes
+`app-release-signed.aab`, and prints its SHA-1.
 
 To release a new version, raise `version` and `android.versionCode` in
 `app.json`. The version code must be higher than any build ever uploaded to

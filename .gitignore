@@ -13,10 +13,14 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+# signing config; the real one lives in ~/.gradle/gradle.properties, outside the repo
+keystore.properties
+/gradle.properties
 
 # Metro
 .metro-health-check*

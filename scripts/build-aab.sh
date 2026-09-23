@@ -8,13 +8,19 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-read -rsp "Upload keystore password: " password
-echo
-
-# PKCS12 keystores use one password for the store and the key.
-# Gradle reads ORG_GRADLE_PROJECT_* variables as project properties.
-export ORG_GRADLE_PROJECT_GAME4096_UPLOAD_STORE_PASSWORD="$password"
-export ORG_GRADLE_PROJECT_GAME4096_UPLOAD_KEY_PASSWORD="$password"
+props="$HOME/.gradle/gradle.properties"
+if grep -qE '^GAME4096_UPLOAD_STORE_PASSWORD=.+' "$props" 2>/dev/null &&
+   grep -qE '^GAME4096_UPLOAD_KEY_PASSWORD=.+' "$props" 2>/dev/null; then
+  echo "Upload key configured; signing automatically."
+else
+  echo "No password in $props, asking for this build only."
+  read -rsp "Upload keystore password: " password
+  echo
+  # PKCS12 keystores use one password for the store and the key.
+  # Gradle reads ORG_GRADLE_PROJECT_* variables as project properties.
+  export ORG_GRADLE_PROJECT_GAME4096_UPLOAD_STORE_PASSWORD="$password"
+  export ORG_GRADLE_PROJECT_GAME4096_UPLOAD_KEY_PASSWORD="$password"
+fi
 
 # --no-clean updates android/ in place; the default would delete it and throw
 # away all the compiled native code.
