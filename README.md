@@ -81,6 +81,16 @@ To build without the prompt, add `GAME4096_UPLOAD_STORE_PASSWORD` and
 way, building a bundle without all four properties fails straight away rather
 than falling back to the debug key, which Play would reject.
 
+To build the bundle and sign it separately, add `-PGAME4096_UNSIGNED_BUNDLE`.
+That leaves it unsigned, which Play refuses outright, unlike a debug-signed
+bundle that looks finished until it's rejected on upload. Sign it afterwards:
+
+```bash
+"$JAVA_HOME/bin/jarsigner" -keystore "C:/Users/stg/Downloads/user (1).keystore" \
+  -signedjar app-release-signed.aab \
+  android/app/build/outputs/bundle/release/app-release.aab 2048
+```
+
 To release a new version, raise `version` and `android.versionCode` in
 `app.json`. The version code must be higher than any build ever uploaded to
 Play, including rejected ones.

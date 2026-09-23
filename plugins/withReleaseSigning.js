@@ -14,12 +14,16 @@ const MARKER = '// game4096: upload-key signing';
 const SETUP = `${MARKER}
 def uploadKeyProps = [${PROPS.map((name) => `'${name}'`).join(', ')}]
 def hasUploadKey = uploadKeyProps.every { project.hasProperty(it) }
+// -PGAME4096_UNSIGNED_BUNDLE builds the bundle without signing it, to be signed
+// afterwards with jarsigner. Unsigned is safe: Play refuses it outright, where a
+// debug-signed bundle looks finished and is rejected on upload.
+def unsignedBundle = project.hasProperty('GAME4096_UNSIGNED_BUNDLE')
 // An app bundle only ever goes to Google Play, which rejects the debug key, so
 // never let one fall back to it. APKs for testing on your own phone still can.
 def buildingBundle = gradle.startParameter.taskNames.any { it.toLowerCase().endsWith('bundlerelease') }
-if (buildingBundle && !hasUploadKey) {
+if (buildingBundle && !hasUploadKey && !unsignedBundle) {
     def missing = uploadKeyProps.findAll { !project.hasProperty(it) }
-    throw new GradleException("A Google Play app bundle must be signed with the upload key. Add \${missing.join(', ')} to ~/.gradle/gradle.properties.")
+    throw new GradleException("A Google Play app bundle must be signed with the upload key. Add \${missing.join(', ')} to ~/.gradle/gradle.properties, or pass -PGAME4096_UNSIGNED_BUNDLE to build it unsigned and sign it yourself.")
 }
 
 `;
@@ -44,7 +48,7 @@ function patch(contents) {
     [
       /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
       (_match, before) =>
-        `${before}signingConfig hasUploadKey ? signingConfigs.release : signingConfigs.debug`,
+        `${before}signingConfig unsignedBundle ? null : (hasUploadKey ? signingConfigs.release : signingConfigs.debug)`,
     ],
     [/signingConfigs\s*\{/, (match) => `${match}${RELEASE_SIGNING}`],
     [/^android\s*\{/m, (match) => `${SETUP}${match}`],
