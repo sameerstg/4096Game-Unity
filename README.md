@@ -85,10 +85,13 @@ page. The bundle lands in
 this machine `bash` resolves to a WSL stub with no distribution installed, so
 the PowerShell version is the one to use.
 
-The scripts build for 32- and 64-bit ARM, which covers every Android phone.
-x86 only matters for emulators and a few Chromebooks (the Unity build shipped
-64-bit ARM alone), and leaving it out halves the native compile, which can
-otherwise run a 16 GB machine out of memory.
+The scripts build all four architectures: 32- and 64-bit ARM for phones, plus
+x86 and x86_64 for Chromebooks and emulators. In a bundle the extra ones cost
+users nothing, because Play sends each device only the code it needs — about
+11.8 MB either way — they only make the uploaded file bigger. They do double
+the native compile, which can exhaust a 16 GB machine, so the scripts cap how
+many build tasks run at once. To build for one architecture while developing,
+pass `-PreactNativeArchitectures=arm64-v8a`.
 
 Building a bundle with any of the four properties missing fails immediately
 rather than falling back to the debug key, which Play would reject. To build

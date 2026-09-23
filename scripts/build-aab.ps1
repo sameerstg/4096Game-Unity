@@ -40,14 +40,14 @@ try {
 
     Push-Location (Join-Path $root 'android')
     try {
-        # ARM covers every Android phone; x86 only matters for emulators and a
-        # few Chromebooks, and building it as well can run a 16 GB machine out
-        # of memory, as can running too many build tasks at once.
+        # All four architectures: a bundle costs users nothing for the extra
+        # ones, because Play sends each device only the code it needs, and x86
+        # keeps Chromebooks and emulators supported. Cap the parallel tasks
+        # though: compiling four at once can exhaust a 16 GB machine.
         # Passed as an array: PowerShell mangles "a,b" and "app:task" written inline.
         $gradleArgs = @(
             'app:bundleRelease',
-            '--max-workers=2',
-            '-PreactNativeArchitectures=armeabi-v7a,arm64-v8a'
+            '--max-workers=2'
         )
         & .\gradlew.bat @gradleArgs
         if ($LASTEXITCODE -ne 0) { throw "gradle failed ($LASTEXITCODE)" }

@@ -25,12 +25,11 @@ fi
 # --no-clean updates android/ in place; the default would delete it and throw
 # away all the compiled native code.
 npx expo prebuild --platform android --no-install --no-clean
-# ARM covers every Android phone; x86 only matters for emulators and a few
-# Chromebooks, and the Unity build shipped 64-bit ARM alone. Leaving x86 out
-# also halves the native compile, which can run a 16 GB machine out of memory,
-# as can running too many build tasks at once.
-(cd android && ./gradlew app:bundleRelease --max-workers=2 \
-  -PreactNativeArchitectures=armeabi-v7a,arm64-v8a)
+# All four architectures: a bundle costs users nothing for the extra ones,
+# because Play sends each device only the code it needs, and x86 keeps
+# Chromebooks and emulators supported. Cap the parallel tasks though:
+# compiling four at once can exhaust a 16 GB machine.
+(cd android && ./gradlew app:bundleRelease --max-workers=2)
 
 aab="android/app/build/outputs/bundle/release/app-release.aab"
 keytool="${JAVA_HOME:-/c/Program Files/Android/Android Studio/jbr}/bin/keytool"
