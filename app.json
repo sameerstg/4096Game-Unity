@@ -2,7 +2,7 @@
   "expo": {
     "name": "4096",
     "slug": "expo-4096",
-    "version": "0.4",
+    "version": "0.5",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,11 +10,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sameerstg.game4096",
-      "buildNumber": "4"
+      "buildNumber": "5"
     },
     "android": {
       "package": "com.Sameerstg.numberPuzzleGame",
-      "versionCode": 4,
+      "versionCode": 5,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_EXTERNAL_STORAGE",

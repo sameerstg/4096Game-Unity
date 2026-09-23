@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.4 (version code 4)
+## 0.5 (version code 5)
 
 The first release built on Expo and React Native. It replaces the Unity game
 that was live as 0.2 (version code 2) on the same listing,
