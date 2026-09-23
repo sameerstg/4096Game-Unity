@@ -142,6 +142,12 @@ colour. Everything visual lives in `src/game/config.ts`.
 apart, every number must reach 3:1 contrast, and the text colour must switch
 exactly once.
 
+The app icons come from the same colours and font. `node scripts/make-icons.js`
+renders them with headless Chrome: tiles growing into the gold 2048 goal tile.
+It writes `assets/icon.png`, the two Android adaptive layers, `favicon.png`,
+and `store-icon.png`, the 512×512 image to upload in Play Console. The Android
+foreground is scaled to stay inside the circle launchers may crop to.
+
 ## Game flow
 
 - Each merge shows a floating `+N` on the score.

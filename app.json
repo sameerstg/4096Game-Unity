@@ -6,7 +6,7 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#19E5FF",
+    "backgroundColor": "#B7B6FC",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.sameerstg.game4096",
@@ -22,7 +22,7 @@
         "android.permission.VIBRATE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#19E5FF",
+        "backgroundColor": "#B7B6FC",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
