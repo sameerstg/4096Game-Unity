@@ -106,6 +106,31 @@ To release a new version, raise `version` and `android.versionCode` in
 `app.json`. The version code must be higher than any build ever uploaded to
 Play, including rejected ones.
 
+Upload `android/app/build/outputs/mapping/release/mapping.txt` alongside a
+release, or Play's crash reports will show obfuscated names. App bundles carry
+it automatically, under `BUNDLE-METADATA`.
+
+## Permissions and size
+
+The release build requests exactly one permission, `MODIFY_AUDIO_SETTINGS`,
+which comes with the audio library.
+
+`android.blockedPermissions` in `app.json` strips everything else the Expo
+template and its libraries pull in, including `INTERNET`,
+`ACCESS_NETWORK_STATE` and `WAKE_LOCK`. The game is entirely offline, and its
+listing was removed under the Device and Network Abuse policy, so it should not
+ask for network access at all. Development builds still need `INTERNET` to
+reach Metro, so `plugins/withDebugInternet.js` puts it back in the debug
+manifest only; a build type's manifest outranks the main one's removal, which
+is how the template already handles `SYSTEM_ALERT_WINDOW`.
+
+`expo-build-properties` turns on R8 and resource shrinking for release builds.
+That took the compiled code from 25.8 MB to 9.0 MB, and a phone's download from
+about 17.8 MB to 11.8 MB. Minification can break React Native through
+reflection, so after changing it, test a release build on a device rather than
+trusting the build to succeed: launch it, play a few moves, then force-stop and
+reopen it to check the saved board still loads.
+
 `app.json` configures `expo-audio` without microphone access or background
 playback. The game only plays sound in the foreground, and leaving the plugin
 defaults on would add `RECORD_AUDIO` and a foreground-service permission that
