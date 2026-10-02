@@ -1,0 +1,112 @@
+<!doctype html>
+<!--
+  Store-screenshot helper, used by scripts/make-screenshots.js.
+
+  Seeds a board into storage, then loads the game in a full-viewport iframe so
+  headless Chrome can photograph a chosen game state. Same origin, so the seed
+  and the key presses reach the app. Not part of the game.
+-->
+<meta charset="utf-8" />
+<!-- without this the page lays out at Chrome's default 980px and the game
+     renders far too wide for the shot -->
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>screenshot</title>
+<style>
+  /* The game lays out at a phone width (360x640) and is scaled 3x for the
+     capture, giving a 1080x1920 file — the 9:16 Play asks for — without
+     Chrome clamping a small window to a larger one and cropping the shot. */
+  html, body { margin: 0; padding: 0; width: 1080px; height: 1920px; overflow: hidden; }
+  iframe { display: block; border: 0; width: 360px; height: 640px;
+           transform: scale(3); transform-origin: 0 0; }
+</style>
+<body>
+  <script>
+    const cells = (rows) => {
+      const out = [];
+      rows.forEach((row, r) =>
+        row.forEach((value, c) => {
+          if (value) out.push({ value, row: r, col: c });
+        })
+      );
+      return out;
+    };
+
+    const SCENES = {
+      // a game in full flow, lots of colour
+      mid: {
+        mode: 0,
+        target: 2048,
+        best: 3120,
+        board: { size: 4, score: 1240, keepPlaying: false, cells: cells([
+          [64, 32, 8, 4],
+          [32, 16, 4, 2],
+          [8, 4, 2, 0],
+          [4, 2, 0, 0],
+        ]) },
+      },
+      // late game, closing in on the goal
+      big: {
+        mode: 0,
+        target: 2048,
+        best: 24680,
+        board: { size: 4, score: 18640, keepPlaying: false, cells: cells([
+          [1024, 256, 64, 8],
+          [512, 128, 32, 4],
+          [64, 16, 8, 2],
+          [8, 4, 2, 0],
+        ]) },
+      },
+      // the biggest board
+      six: {
+        mode: 3,
+        target: 16384,
+        best: 9400,
+        board: { size: 6, score: 7320, keepPlaying: false, cells: cells([
+          [256, 128, 32, 16, 8, 4],
+          [128, 64, 16, 8, 4, 2],
+          [32, 16, 8, 4, 2, 0],
+          [16, 8, 4, 2, 0, 0],
+          [8, 4, 2, 0, 0, 0],
+          [4, 2, 0, 0, 0, 0],
+        ]) },
+      },
+      // one move from the goal; the left press triggers the win dialog
+      win: {
+        mode: 0,
+        target: 2048,
+        best: 24680,
+        keys: ['ArrowLeft'],
+        board: { size: 4, score: 20120, keepPlaying: false, cells: cells([
+          [1024, 1024, 64, 8],
+          [256, 128, 32, 4],
+          [64, 16, 8, 2],
+          [8, 4, 2, 0],
+        ]) },
+      },
+    };
+
+    const scene = SCENES[new URLSearchParams(location.search).get('s')] || SCENES.mid;
+
+    localStorage.clear();
+    localStorage.setItem('mode', String(scene.mode));
+    // music on, so the button isn't shown muted in a store screenshot
+    localStorage.setItem('music', 'true');
+    localStorage.setItem(`best:${scene.target}`, String(scene.best));
+    localStorage.setItem(`board:${scene.target}`, JSON.stringify(scene.board));
+
+    const frame = document.createElement('iframe');
+    frame.src = '/';
+    frame.addEventListener('load', () => {
+      if (!scene.keys) return;
+      // let the board settle, then play the move that opens the dialog
+      setTimeout(() => {
+        for (const key of scene.keys) {
+          frame.contentDocument.dispatchEvent(
+            new frame.contentWindow.KeyboardEvent('keydown', { key, bubbles: true })
+          );
+        }
+      }, 2500);
+    });
+    document.body.appendChild(frame);
+  </script>
+</body>

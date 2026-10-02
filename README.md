@@ -191,6 +191,25 @@ colour. Everything visual lives in `src/game/config.ts`.
 apart, every number must reach 3:1 contrast, and the text colour must switch
 exactly once.
 
+## Store assets
+
+Everything Play needs is generated, so it can't drift from the game's look:
+
+```bash
+node scripts/make-icons.js           # app icons + store/512 icon
+node scripts/make-store-graphics.js  # store/feature-graphic.png (1024x500)
+
+npx expo start --web --port 8083     # in one terminal, then:
+node scripts/make-screenshots.js     # store/screenshots/*.png (1080x1920)
+```
+
+The screenshots are real captures of the running game. `public/shot.html` seeds
+a board into storage and loads the game at a phone width scaled to 1080x1920,
+the 9:16 ratio Play asks for. Edit the `SCENES` object there to change which
+boards are photographed.
+
+## Look and feel, continued
+
 The app icons come from the same colours and font. `node scripts/make-icons.js`
 renders them with headless Chrome: the gold 2048 goal tile, alone so its number
 still reads at launcher size. It writes `assets/icon.png`, the three Android
